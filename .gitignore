@@ -1,5 +1,28 @@
+# Python
 venv/
 __pycache__/
-.env
 *.pyc
 .DS_Store
+
+# 環境變數（永遠別入庫）
+.env
+*.key
+*.pem
+
+# Docker 資料與 Volume 掛載（不要 commit 這些）
+spark_ckpt/
+pg_data/
+kafka_data/
+volumes/
+
+# Spark Checkpoint（內含 offset 與狀態資料）
+checkpoint/
+spark-events/
+
+# VSCode / JetBrains IDE 設定檔
+.vscode/
+.idea/
+
+# 日誌（有些 container 可能產生）
+*.log
+

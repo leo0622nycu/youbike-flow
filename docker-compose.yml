@@ -1,0 +1,72 @@
+services:
+  # ----- ZooKeeper -----
+  zookeeper:
+    image: bitnami/zookeeper:3.9          # 輕量版，免自行安裝 Java
+    container_name: zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes         # 開發環境先不設帳密
+    ports:
+      - "2181:2181"                       # 主機→容器
+
+  # ----- Kafka Broker -----
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: kafka
+    depends_on:
+      - zookeeper                         # 先等 ZooKeeper 完成
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181 
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092   # ←硬寫成 kafka
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - KAFKA_BROKER_ID=1
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/bitnami/kafka         # Topic 與 log 存這裡
+
+  # ----- PostgreSQL -----
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "15432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data  # DB 持久化
+  spark:
+    image: bitnami/spark:3.5
+    container_name: spark
+    user: root                     # 省得 /root/.ivy2 權限問題
+    volumes:
+      - ./spark_jobs:/opt/spark_jobs
+      - spark_ckpt:/spark_ckpt
+      - spark_ivy:/root/.ivy2      # 把 Maven 下載的 jar 存起來
+    # ⬇️ 完全覆蓋預設 ENTRYPOINT
+    entrypoint: ["/opt/bitnami/spark/bin/spark-submit"]
+    # ⬇️ 把參數放在 command，ENTRYPOINT+CMD 組合就是完整 spark-submit
+    command:
+      - --master
+      - local[*]
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.postgresql:postgresql:42.7.3
+      - --conf
+      - spark.jars.ivy=/root/.ivy2        # ivy 目錄指到有寫權限的位置
+      - /opt/spark_jobs/youbike_stream.py
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+      - postgres
+
+
+
+volumes:
+  kafka_data:
+  pg_data:
+  spark_ckpt:
+  spark_ivy: 
